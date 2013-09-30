@@ -26,7 +26,7 @@
  * @param bool $unique Optional, default is false. Whether the specified metadata key should be
  * 		unique for the object. If true, and the object already has a value for the specified
  * 		metadata key, no change will be made
- * @return bool The meta ID on successful update, false on failure.
+ * @return int|bool The meta ID on successful update, false on failure.
  */
 function add_metadata($meta_type, $object_id, $meta_key, $meta_value, $unique = false) {
 	if ( !$meta_type || !$meta_key )
@@ -678,7 +678,7 @@ class WP_Meta_Query {
 		}
 
 		// WP_Query sets 'meta_value' = '' by default
-		if ( isset( $qv[ 'meta_value' ] ) && '' !== $qv[ 'meta_value' ] )
+		if ( isset( $qv[ 'meta_value' ] ) && '' !== $qv[ 'meta_value' ] && ( ! is_array( $qv[ 'meta_value' ] ) || $qv[ 'meta_value' ] ) )
 			$meta_query[0]['value'] = $qv[ 'meta_value' ];
 
 		if ( !empty( $qv['meta_query'] ) && is_array( $qv['meta_query'] ) ) {
@@ -714,6 +714,14 @@ class WP_Meta_Query {
 		$key_only_queries = array();
 		$queries = array();
 
+		// Split out the queries with empty arrays as value
+		foreach ( $this->queries as $k => $q ) {
+			if ( isset( $q['value'] ) && is_array( $q['value'] ) && empty( $q['value'] ) ) {
+				$key_only_queries[$k] = $q;
+				unset( $this->queries[$k] );
+			}
+		}		
+		
 		// Split out the meta_key only queries (we can only do this for OR)
 		if ( 'OR' == $this->relation ) {
 			foreach ( $this->queries as $k => $q ) {

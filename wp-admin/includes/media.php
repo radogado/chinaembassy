@@ -496,9 +496,8 @@ function media_upload_form_handler() {
 
 	if ( !empty($_POST['attachments']) ) foreach ( $_POST['attachments'] as $attachment_id => $attachment ) {
 		$post = $_post = get_post($attachment_id, ARRAY_A);
-		$post_type_object = get_post_type_object( $post[ 'post_type' ] );
 
-		if ( !current_user_can( $post_type_object->cap->edit_post, $attachment_id ) )
+		if ( !current_user_can( 'edit_post', $attachment_id ) )
 			continue;
 
 		if ( isset($attachment['post_content']) )
@@ -1503,7 +1502,7 @@ function media_upload_form( $errors = null ) {
 	global $type, $tab, $pagenow, $is_IE, $is_opera;
 
 	if ( ! _device_can_upload() ) {
-		echo '<p>' . __('The web browser on your device cannot be used to upload files. You may be able to use the <a href="http://wordpress.org/extend/mobile/">native app for your device</a> instead.') . '</p>';
+		echo '<p>' . sprintf( __('The web browser on your device cannot be used to upload files. You may be able to use the <a href="%s">native app for your device</a> instead.'), 'http://wordpress.org/mobile/' ) . '</p>';
 		return;
 	}
 
@@ -2321,9 +2320,7 @@ function multisite_over_quota_message() {
  *
  * @since 3.5.0
  */
-function edit_form_image_editor() {
-	$post = get_post();
-
+function edit_form_image_editor( $post ) {
 	$open = isset( $_GET['image-editor'] );
 	if ( $open )
 		require_once ABSPATH . 'wp-admin/includes/image-edit.php';
@@ -2359,7 +2356,7 @@ function edit_form_image_editor() {
 	<?php
 	elseif ( $attachment_id && 0 === strpos( $post->post_mime_type, 'audio/' ) ):
 
-		echo do_shortcode( '[audio src="' . $att_url . '"]' );
+		echo wp_audio_shortcode( array( 'src' => $att_url ) );
 
 	elseif ( $attachment_id && 0 === strpos( $post->post_mime_type, 'video/' ) ):
 
@@ -2371,12 +2368,15 @@ function edit_form_image_editor() {
 		if ( $h && $w < $meta['width'] )
 			$h = round( ( $meta['height'] * $w ) / $meta['width'] );
 
-		$shortcode = sprintf( '[video src="%s"%s%s]',
-			$att_url,
-			empty( $meta['width'] ) ? '' : sprintf( ' width="%d"', $w ),
-			empty( $meta['height'] ) ? '' : sprintf( ' height="%d"', $h )
-		);
-		echo do_shortcode( $shortcode );
+		$attr = array( 'src' => $att_url );
+
+		if ( ! empty( $meta['width' ] ) )
+			$attr['width'] = $w;
+
+		if ( ! empty( $meta['height'] ) )
+			$attr['height'] = $h;
+
+		echo wp_video_shortcode( $attr );
 
 	endif; ?>
 	</div>
@@ -2422,7 +2422,7 @@ function edit_form_image_editor() {
 function attachment_submitbox_metadata() {
 	$post = get_post();
 
-	$filename = esc_html( basename( $post->guid ) );
+	$filename = esc_html( wp_basename( $post->guid ) );
 
 	$media_dims = '';
 	$meta = wp_get_attachment_metadata( $post->ID );
@@ -2578,7 +2578,7 @@ function wp_read_video_metadata( $file ) {
 	$metadata = array();
 
 	if ( ! class_exists( 'getID3' ) )
-		require( ABSPATH . WPINC . '/ID3/class-getid3.php' );
+		require( ABSPATH . WPINC . '/ID3/getid3.php' );
 	$id3 = new getID3();
 	$data = $id3->analyze( $file );
 
@@ -2633,7 +2633,7 @@ function wp_read_audio_metadata( $file ) {
 	$metadata = array();
 
 	if ( ! class_exists( 'getID3' ) )
-		require( ABSPATH . WPINC . '/ID3/class-getid3.php' );
+		require( ABSPATH . WPINC . '/ID3/getid3.php' );
 	$id3 = new getID3();
 	$data = $id3->analyze( $file );
 

@@ -480,7 +480,7 @@ class WP_Posts_List_Table extends WP_List_Table {
 		$edit_link = get_edit_post_link( $post->ID );
 		$title = _draft_or_post_title();
 		$post_type_object = get_post_type_object( $post->post_type );
-		$can_edit_post = current_user_can( $post_type_object->cap->edit_post, $post->ID );
+		$can_edit_post = current_user_can( 'edit_post', $post->ID );
 
 		$alternate = 'alternate' == $alternate ? '' : 'alternate';
 		$classes = $alternate . ' iedit author-' . ( get_current_user_id() == $post->post_author ? 'self' : 'other' );
@@ -551,7 +551,7 @@ class WP_Posts_List_Table extends WP_List_Table {
 				if ( $format = get_post_format( $post->ID ) ) {
 					$label = get_post_format_string( $format );
 
-					echo '<a href="' . esc_url( add_query_arg( array( 'post_format' => $format, 'post_type' => $post->post_type ), 'edit.php' ) ) . '" class="post-state-format format-' . $format . '" title="' . $label . '">' . $label . ":</a> ";
+					echo '<a href="' . esc_url( add_query_arg( array( 'post_format' => $format, 'post_type' => $post->post_type ), 'edit.php' ) ) . '" class="post-state-format post-format-icon post-format-' . $format . '" title="' . $label . '">' . $label . ":</a> ";
 				}
 
 				if ( $can_edit_post && $post->post_status != 'trash' ) {
@@ -574,7 +574,7 @@ class WP_Posts_List_Table extends WP_List_Table {
 						$locked_avatar = $locked_text = '';
 					}
 
-					echo '<span class="locked-avatar">' . $locked_avatar . '</span> <span class="locked-text">' . $locked_text . "</span>\n";
+					echo '<div class="locked-info"><span class="locked-avatar">' . $locked_avatar . '</span> <span class="locked-text">' . $locked_text . "</span></div>\n";
 				}
 
 				if ( ! $this->hierarchical_display && 'excerpt' == $mode && current_user_can( 'read_post', $post->ID ) )
@@ -585,7 +585,7 @@ class WP_Posts_List_Table extends WP_List_Table {
 					$actions['edit'] = '<a href="' . get_edit_post_link( $post->ID, true ) . '" title="' . esc_attr( __( 'Edit this item' ) ) . '">' . __( 'Edit' ) . '</a>';
 					$actions['inline hide-if-no-js'] = '<a href="#" class="editinline" title="' . esc_attr( __( 'Edit this item inline' ) ) . '">' . __( 'Quick&nbsp;Edit' ) . '</a>';
 				}
-				if ( current_user_can( $post_type_object->cap->delete_post, $post->ID ) ) {
+				if ( current_user_can( 'delete_post', $post->ID ) ) {
 					if ( 'trash' == $post->post_status )
 						$actions['untrash'] = "<a title='" . esc_attr( __( 'Restore this item from the Trash' ) ) . "' href='" . wp_nonce_url( admin_url( sprintf( $post_type_object->_edit_link . '&amp;action=untrash', $post->ID ) ), 'untrash-post_' . $post->ID ) . "'>" . __( 'Restore' ) . "</a>";
 					elseif ( EMPTY_TRASH_DAYS )
@@ -1046,12 +1046,11 @@ class WP_Posts_List_Table extends WP_List_Table {
 		}
 	?>
 		<p class="submit inline-edit-save">
-			<a accesskey="c" href="#inline-edit" title="<?php esc_attr_e( 'Cancel' ); ?>" class="button-secondary cancel alignleft"><?php _e( 'Cancel' ); ?></a>
+			<a accesskey="c" href="#inline-edit" class="button-secondary cancel alignleft"><?php _e( 'Cancel' ); ?></a>
 			<?php if ( ! $bulk ) {
 				wp_nonce_field( 'inlineeditnonce', '_inline_edit', false );
-				$update_text = __( 'Update' );
 				?>
-				<a accesskey="s" href="#inline-edit" title="<?php esc_attr_e( 'Update' ); ?>" class="button-primary save alignright"><?php echo esc_attr( $update_text ); ?></a>
+				<a accesskey="s" href="#inline-edit" class="button-primary save alignright"><?php _e( 'Update' ); ?></a>
 				<span class="spinner"></span>
 			<?php } else {
 				submit_button( __( 'Update' ), 'button-primary alignright', 'bulk_edit', false, array( 'accesskey' => 's' ) );

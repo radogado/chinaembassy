@@ -496,6 +496,7 @@ function wp_get_http( $url, $file_path = false, $red = 1 ) {
 
 	$options = array();
 	$options['redirection'] = 5;
+	$options['reject_unsafe_urls'] = true;
 
 	if ( false == $file_path )
 		$options['method'] = 'HEAD';
@@ -543,7 +544,7 @@ function wp_get_http_headers( $url, $deprecated = false ) {
 	if ( !empty( $deprecated ) )
 		_deprecated_argument( __FUNCTION__, '2.7' );
 
-	$response = wp_remote_head( $url );
+	$response = wp_remote_head( $url, array( 'reject_unsafe_urls' => true ) );
 
 	if ( is_wp_error( $response ) )
 		return false;
@@ -655,10 +656,10 @@ function add_query_arg() {
 	else
 		$frag = '';
 
-	if ( 0 === stripos( 'http://', $uri ) ) {
+	if ( 0 === stripos( $uri, 'http://' ) ) {
 		$protocol = 'http://';
 		$uri = substr( $uri, 7 );
-	} elseif ( 0 === stripos( 'https://', $uri ) ) {
+	} elseif ( 0 === stripos( $uri, 'https://' ) ) {
 		$protocol = 'https://';
 		$uri = substr( $uri, 8 );
 	} else {
@@ -758,6 +759,7 @@ function wp_remote_fopen( $uri ) {
 
 	$options = array();
 	$options['timeout'] = 10;
+	$options['reject_unsafe_urls'] = true;
 
 	$response = wp_remote_get( $uri, $options );
 
@@ -2981,9 +2983,15 @@ function _doing_it_wrong( $function, $message, $version ) {
 
 	// Allow plugin to filter the output error trigger
 	if ( WP_DEBUG && apply_filters( 'doing_it_wrong_trigger_error', true ) ) {
-		$version = is_null( $version ) ? '' : sprintf( __( '(This message was added in version %s.)' ), $version );
-		$message .= ' ' . __( 'Please see <a href="http://codex.wordpress.org/Debugging_in_WordPress">Debugging in WordPress</a> for more information.' );
-		trigger_error( sprintf( __( '%1$s was called <strong>incorrectly</strong>. %2$s %3$s' ), $function, $message, $version ) );
+		if ( function_exists( '__' ) ) {
+			$version = is_null( $version ) ? '' : sprintf( __( '(This message was added in version %s.)' ), $version );
+			$message .= ' ' . __( 'Please see <a href="http://codex.wordpress.org/Debugging_in_WordPress">Debugging in WordPress</a> for more information.' );
+			trigger_error( sprintf( __( '%1$s was called <strong>incorrectly</strong>. %2$s %3$s' ), $function, $message, $version ) );
+		} else {
+			$version = is_null( $version ) ? '' : sprintf( '(This message was added in version %s.)', $version );
+			$message .= ' Please see <a href="http://codex.wordpress.org/Debugging_in_WordPress">Debugging in WordPress</a> for more information.';
+			trigger_error( sprintf( '%1$s was called <strong>incorrectly</strong>. %2$s %3$s', $function, $message, $version ) );
+		}
 	}
 }
 
@@ -3030,7 +3038,7 @@ function apache_mod_loaded($mod, $default = false) {
 }
 
 /**
- * Check if IIS 7 supports pretty permalinks.
+ * Check if IIS 7+ supports pretty permalinks.
  *
  * @since 2.8.0
  *
@@ -3041,11 +3049,10 @@ function iis7_supports_permalinks() {
 
 	$supports_permalinks = false;
 	if ( $is_iis7 ) {
-		/* First we check if the DOMDocument class exists. If it does not exist,
-		 * which is the case for PHP 4.X, then we cannot easily update the xml configuration file,
-		 * hence we just bail out and tell user that pretty permalinks cannot be used.
-		 * This is not a big issue because PHP 4.X is going to be deprecated and for IIS it
-		 * is recommended to use PHP 5.X NTS.
+		/* First we check if the DOMDocument class exists. If it does not exist, then we cannot
+		 * easily update the xml configuration file, hence we just bail out and tell user that
+		 * pretty permalinks cannot be used.
+		 *
 		 * Next we check if the URL Rewrite Module 1.1 is loaded and enabled for the web site. When
 		 * URL Rewrite 1.1 is loaded it always sets a server variable called 'IIS_UrlRewriteModule'.
 		 * Lastly we make sure that PHP is running via FastCGI. This is important because if it runs
@@ -3921,9 +3928,12 @@ function wp_auth_check_load() {
  * Output the HTML that shows the wp-login dialog when the user is no longer logged in
  */
 function wp_auth_check_html() {
-	$login_url = site_url( 'wp-login.php', 'login_post' );
+	$login_url = wp_login_url();
 	$current_domain = ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'];
 	$same_domain = ( strpos( $login_url, $current_domain ) === 0 );
+
+	if ( $same_domain && force_ssl_login() && ! force_ssl_admin() )
+		$same_domain = false;
 
 	// Let plugins change this if they know better.
 	$same_domain = apply_filters( 'wp_auth_check_same_domain', $same_domain );
@@ -3933,6 +3943,7 @@ function wp_auth_check_html() {
 	<div id="wp-auth-check-wrap" class="<?php echo $wrap_class; ?>">
 	<div id="wp-auth-check-bg"></div>
 	<div id="wp-auth-check">
+	<div class="wp-auth-check-close" tabindex="0" title="<?php esc_attr_e('Close'); ?>"></div>
 	<?php
 
 	if ( $same_domain ) {
@@ -3947,7 +3958,6 @@ function wp_auth_check_html() {
 		<p><a href="<?php echo esc_url( $login_url ); ?>" target="_blank"><?php _e('Please log in again.'); ?></a>
 		<?php _e('The login page will open in a new window. After logging in you can close it and return to this page.'); ?></p>
 	</div>
-	<p class="wp-auth-check-close"><a href="#" class="button button-primary"><?php _e('Close'); ?></a></p>
 	</div>
 	</div>
 	<?php
@@ -3964,9 +3974,9 @@ function wp_auth_check( $response, $data ) {
 
 	// If the user is logged in and we are outside the login grace period, bail.
 	if ( is_user_logged_in() && empty( $GLOBALS['login_grace_period'] ) )
-		return $response;
+		return array_merge( $response, array( 'wp-auth-check' => '1' ) );
 
-	return array_merge( $response, array( 'wp-auth-check' => '1' ) );
+	return array_merge( $response, array( 'wp-auth-check' => 'show' ) );
 }
 
 /**
@@ -3986,4 +3996,26 @@ function get_tag_regex( $tag ) {
 	if ( empty( $tag ) )
 		return;
 	return sprintf( '<%1$s[^<]*(?:>[\s\S]*<\/%1$s>|\s*\/>)', tag_escape( $tag ) );
+}
+
+/**
+ * Return a canonical form of the provided charset appropriate for passing to PHP
+ * functions such as htmlspecialchars() and charset html attributes.
+ *
+ * @link http://core.trac.wordpress.org/ticket/23688
+ * @since 3.6.0
+ *
+ * @param string A charset name
+ * @return string The canonical form of the charset
+ */
+function _canonical_charset( $charset ) {
+	if ( 'UTF-8' === $charset || 'utf-8' === $charset || 'utf8' === $charset ||
+		'UTF8' === $charset )
+		return 'UTF-8';
+
+	if ( 'ISO-8859-1' === $charset || 'iso-8859-1' === $charset ||
+		'iso8859-1' === $charset || 'ISO8859-1' === $charset )
+		return 'ISO-8859-1';
+
+	return $charset;
 }

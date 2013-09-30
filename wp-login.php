@@ -407,14 +407,11 @@ $interim_login = isset($_REQUEST['interim-login']);
 switch ($action) {
 
 case 'postpass' :
-	if ( empty( $wp_hasher ) ) {
-		require_once( ABSPATH . 'wp-includes/class-phpass.php' );
-		// By default, use the portable hash from phpass
-		$wp_hasher = new PasswordHash(8, true);
-	}
+	require_once ABSPATH . 'wp-includes/class-phpass.php';
+	$hasher = new PasswordHash( 8, true );
 
 	// 10 days
-	setcookie( 'wp-postpass_' . COOKIEHASH, $wp_hasher->HashPassword( wp_unslash( $_POST['post_password'] ) ), time() + 10 * DAY_IN_SECONDS, COOKIEPATH );
+	setcookie( 'wp-postpass_' . COOKIEHASH, $hasher->HashPassword( wp_unslash( $_POST['post_password'] ) ), time() + 10 * DAY_IN_SECONDS, COOKIEPATH );
 
 	wp_safe_redirect( wp_get_referer() );
 	exit();
@@ -503,7 +500,7 @@ case 'rp' :
 	login_header(__('Reset Password'), '<p class="message reset-pass">' . __('Enter your new password below.') . '</p>', $errors );
 
 ?>
-<form name="resetpassform" id="resetpassform" action="<?php echo esc_url( site_url( 'wp-login.php?action=resetpass&key=' . urlencode( $_GET['key'] ) . '&login=' . urlencode( $_GET['login'] ), 'login_post' ) ); ?>" method="post">
+<form name="resetpassform" id="resetpassform" action="<?php echo esc_url( site_url( 'wp-login.php?action=resetpass&key=' . urlencode( $_GET['key'] ) . '&login=' . urlencode( $_GET['login'] ), 'login_post' ) ); ?>" method="post" autocomplete="off">
 	<input type="hidden" id="user_login" value="<?php echo esc_attr( $_GET['login'] ); ?>" autocomplete="off" />
 
 	<p>
